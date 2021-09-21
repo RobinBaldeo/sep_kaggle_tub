@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 from optuna.integration import LightGBMPruningCallback
+import sklearn.model_selection as ms
 
 pd.set_option('expand_frame_repr', False)
 from sklearn.metrics import accuracy_score, roc_auc_score
 from lightgbm import LGBMClassifier
 import optuna
+from collections import namedtuple
 
 
 class model_best_para:
@@ -54,10 +56,70 @@ class model_best_para:
         return roc_auc_score(yval, preds)
 
     def para(self):
+        para = namedtuple("para", "model_ best_para m_score")
+        lst = []
         for n in ['goss', 'gbdt', 'rf']:
             study = optuna.create_study(direction='maximize', study_name="robin")
             study.optimize(lambda i: self.objective(i, (self.xtrain, self.xval), (self.ytrain, self.yval, n)),
                            n_trials=self.num_iter)
-            print()
-            print(f"best trial {n}: {([j for i, j in study.best_trial.intermediate_values.items()])[-1]}")
-            print(f"Trial #{study.best_trial.number} best trial: {study.best_trial.params}")
+
+            lst.append(para(model_=n, best_para=study.best_trial.params,
+                            m_score=([j for i, j in study.best_trial.intermediate_values.items()])[-1]))
+            # print(f"best trial {n}: {([j for i, j in study.best_trial.intermediate_values.items()])[-1]}")
+            # print(f"Trial #{study.best_trial.number} best trial: {study.best_trial.params}")
+
+        return lst
+
+
+class build_base(model_best_para):
+    def __init__(self, X, Y,test, num_iter, fold):
+        # self.x, self.xval2, self.y, self.yval2 = ms.train_test_split(X, Y, test_size=.1, shuffle=True, random_state=0)
+        self.x, self.xval, self.y, self.yval = ms.train_test_split(X, Y, test_size=.2, shuffle=True,
+                                                                             random_state=0)
+        self.test = test
+        self.xval2 = pd.DataFrame(self.test.drop(columns=["id"]))
+
+        self.folds = fold
+        super().__init__(self.x, self.xval, self.y, self.yval, num_iter)
+
+    def create_base(self):
+        best_par = super().para()
+        weights = []
+
+        meta_data = np.zeros((len(self.xval2), len(best_par)))
+
+        df_split = ms.StratifiedKFold(n_splits=self.folds, shuffle=True)
+
+        for p, m in enumerate(best_par):
+            score = np.zeros((1, self.folds))
+
+            predictions = np.zeros((len(self.xval2), self.folds))
+            weights.append([best_par[p].m_score])
+            model = LGBMClassifier(n_jobs=-1, **m.best_para)
+            for counter, (trn, val) in enumerate(df_split.split(self.x, self.y)):
+                model.fit(self.x.iloc[trn, :], self.y.iloc[trn])
+                w = model.predict_proba(self.xval)[:, 1]
+                score[0, counter] = roc_auc_score(self.yval, w)
+                predictions[:, counter] = model.predict_proba(self.xval2.values)[:, 1]
+                if counter == self.folds - 1:
+                    score = np.reshape(np.dot(1 / np.sum(score), score), (self.folds, 1))
+                    print(score)
+
+            if p == len(best_par) - 1:
+                weights = np.array(weights)
+                print(f"auc score{weights}")
+                weights = (weights / np.sum(weights)).reshape(len(best_par), 1)
+
+            meta_data[:, p] = (np.dot(predictions, score)).ravel()
+
+        pred = np.reshape(np.dot(meta_data, weights), (len(self.xval2), 1))
+
+        # print(roc_auc_score(self.yval2, pred))
+
+        final = pd.DataFrame(self.test["id"])
+        final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
+        final.columns = ["id", "claim"]
+        print(final.head(5))
+
+
+        final.to_csv("sub_v8.csv", index=False)
