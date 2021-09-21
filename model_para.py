@@ -55,6 +55,7 @@ class model_best_para:
 
         return roc_auc_score(yval, preds)
 
+
     def para(self):
         para = namedtuple("para", "model_ best_para m_score")
         lst = []
