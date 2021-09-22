@@ -75,8 +75,8 @@ import optuna
 
 def optuna_():
 
-    folds = 12
-    num_iter  =5
+    folds = 2
+    num_iter  =2
     train = pd.read_csv("train.csv")
     test = pd.read_csv("test.csv")
 
@@ -85,13 +85,30 @@ def optuna_():
     Y = train["claim"]
 
     #
-    # x, xval2, y, yval2 = ms.train_test_split(X, Y,test, test_size=.1, shuffle=True, random_state=0)
+    # x, xval3, y, yval3 = ms.train_test_split(X, Y,test_size=.1, shuffle=True, random_state=0)
 
     # xtrain, xval, ytrain, yval = ms.train_test_split(x, y, test_size=.2, shuffle=True, random_state=0)
     # # xval, xtest, yval, ytest = ms.train_test_split(xval_, yval_, test_size=.5, shuffle=True, random_state=0)
 
-    mbp = build_base(X, Y, test,  num_iter, folds)
-    mbp.create_base()
+    mbp = build_base(X, Y,   num_iter, folds)
+    meta_x, meta_y  = mbp.create_base()
+
+    model = LogisticRegression()
+    model.fit(meta_x, meta_y)
+    pred = model.predict_proba(meta_x.values)[:, 1]
+    print(roc_auc_score(meta_y, pred))
+
+    #
+    # predictions = np.zeros((len(xval3), folds))
+    # df_split = ms.StratifiedKFold(n_splits=folds, shuffle=True)
+    # for counter, (trn, val) in enumerate(df_split.split(meta_x, meta_y )):
+    #     model.fit(meta_x.iloc[trn,:], meta_y.iloc[trn])
+    #     predictions[:,counter] = model.predict_proba(xval3.values)[:,1]
+    #
+    # pred = np.reshape(np.mean(predictions, axis=1), (len(xval3), 1))
+    # print(roc_auc_score(yval3, pred))
+
+
 
 
 
@@ -116,7 +133,7 @@ def optuna_():
     # for counter, (trn, val) in enumerate(df_split.split(x, y)):
     #     model.fit(x.iloc[trn,:], y.iloc[trn])
     #     w = model.predict_proba(xval2)[:,1]
-    #     score[0,counter]= roc_auc_score(yval2, w)
+    #     score[0,counter]= xval3
     #     predictions[:,counter] = model.predict_proba(xtest.values)[:,1]
     #     if counter == folds -1:
     #         score = np.reshape(np.dot(1/np.sum(score), score), (folds, 1))

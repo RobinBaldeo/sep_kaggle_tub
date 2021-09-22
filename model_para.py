@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from optuna.integration import LightGBMPruningCallback
 import sklearn.model_selection as ms
-
+from sklearn.linear_model import LogisticRegression
 pd.set_option('expand_frame_repr', False)
 from sklearn.metrics import accuracy_score, roc_auc_score
 from lightgbm import LGBMClassifier
@@ -73,12 +73,12 @@ class model_best_para:
 
 
 class build_base(model_best_para):
-    def __init__(self, X, Y,test, num_iter, fold):
-        # self.x, self.xval2, self.y, self.yval2 = ms.train_test_split(X, Y, test_size=.1, shuffle=True, random_state=0)
-        self.x, self.xval, self.y, self.yval = ms.train_test_split(X, Y, test_size=.2, shuffle=True,
-                                                                             random_state=0)
-        self.test = test
-        self.xval2 = pd.DataFrame(self.test.drop(columns=["id"]))
+    def __init__(self, X, Y, num_iter, fold):
+        xtrain, self.xval, ytrain, self.yval = ms.train_test_split(X, Y, test_size=.1, shuffle=True, random_state=0)
+        self.x, self.xval2, self.y, self.yval2 = ms.train_test_split(xtrain, ytrain, test_size=.25, shuffle=True,random_state=0)
+
+        # self.test = test
+        # self.xval2 = pd.DataFrame(self.test.drop(columns=["id"]))
 
         self.folds = fold
         super().__init__(self.x, self.xval, self.y, self.yval, num_iter)
@@ -106,21 +106,30 @@ class build_base(model_best_para):
                     score = np.reshape(np.dot(1 / np.sum(score), score), (self.folds, 1))
                     print(score)
 
-            if p == len(best_par) - 1:
-                weights = np.array(weights)
-                print(f"auc score{weights}")
-                weights = (weights / np.sum(weights)).reshape(len(best_par), 1)
+            # if p == len(best_par) - 1:
+            #     weights = np.array(weights)
+            #     print(f"auc score{weights}")
+            #     weights = (weights / np.sum(weights)).reshape(len(best_par), 1)
 
             meta_data[:, p] = (np.dot(predictions, score)).ravel()
 
-        pred = np.reshape(np.dot(meta_data, weights), (len(self.xval2), 1))
-
-        # print(roc_auc_score(self.yval2, pred))
-
-        final = pd.DataFrame(self.test["id"])
-        final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
-        final.columns = ["id", "claim"]
-        print(final.head(5))
+        # pred = np.reshape(np.dot(meta_data, weights), (len(self.xval2), 1))
+        #
+        # print(pred)
+        # model= LogisticRegression()
+        return (pd.DataFrame(meta_data), self.yval2)
 
 
-        final.to_csv("sub_v8.csv", index=False)
+
+
+
+
+
+
+        # final = pd.DataFrame(self.test["id"])
+        # final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
+        # final.columns = ["id", "claim"]
+        # print(final.head(5))
+        #
+        #
+        # final.to_csv("sub_v8.csv", index=False)
