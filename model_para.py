@@ -80,12 +80,13 @@ class model_best_para:
 
 
 class build_base(model_best_para):
-    def __init__(self, x, y,test, num_iter, fold):
-        # self.x, self.xval, self.y, self.yval = ms.train_test_split(X, Y, test_size=.25, shuffle=True, random_state=0)
-        self.x = x
-        self.y = y
-        self.test = test
-        self.xval = pd.DataFrame(self.test.drop(columns=["id"]))
+    def __init__(self, X_, Y_,test, num_iter, fold):
+        X, self.weight, Y, self.weight = ms.train_test_split(X_, Y_, test_size=.1, shuffle=True, random_state=0)
+        self.x, self.xval, self.y, self.yval = ms.train_test_split(X, Y, test_size=.20, shuffle=True, random_state=0)
+        # self.x = x
+        # self.y = y
+        # self.test = test
+        # self.xval = pd.DataFrame(self.test.drop(columns=["id"]))
 
         self.folds = fold
         # super().__init__(self.x, self.xval, self.y, self.yval, num_iter)
@@ -93,12 +94,14 @@ class build_base(model_best_para):
     def create_base_meta(self):
 
         with sqlite3.connect("db.sep_tub.DB") as conn:
-            para = pd.read_sql("select * from base_para", conn)
+            para = pd.read_sql("select model_, best_para, m_score from base_para where model_ in ('rf', 'gbdt')", conn)
+            print(para)
+            print(len(para.index))
             df_split = ms.StratifiedKFold(n_splits=self.folds, shuffle=True)
 
             meta_val_0 = np.zeros((len(self.xval), self.folds))
             meta_val_1 = np.zeros((len(self.xval), self.folds))
-            meta_val_2 = np.zeros((len(self.xval), self.folds))
+            # meta_val_2 = np.zeros((len(self.xval), self.folds))
             meta_val = np.zeros((len(self.xval), len(para.index)))
             train_meta = np.zeros((len(self.x), len(para.index) + 1))
 
@@ -113,34 +116,34 @@ class build_base(model_best_para):
                     best_para = json.loads(p.best_para)
                     model = LGBMClassifier(n_jobs=-1, **best_para)
                     model.fit(self.x.iloc[trn, :], self.y.iloc[trn])
-                    train_meta[start:end, p.index + 1] = model.predict_proba(self.x.iloc[val, :])[:, 1]
-                    if p.index == 0:
+                    train_meta[start:end, p.Index + 1] = model.predict_proba(self.x.iloc[val, :])[:, 1]
+                    if p.Index == 0:
                         meta_val_0[:, counter] = model.predict_proba(self.xval)[:, 1]
-                    elif p.index== 1:
+                    elif p.Index== 1:
                         meta_val_1[:, counter] = model.predict_proba(self.xval)[:, 1]
-                    elif p.index == 2:
-                        meta_val_2 [:, counter] = model.predict_proba(self.xval)[:, 1]
+                    # elif p.index == 2:
+                    #     meta_val_2 [:, counter] = model.predict_proba(self.xval)[:, 1]
 
                 start +=len(val)
 
                 if counter == self.folds - 1:
                     meta_val[:, 0] = np.mean(meta_val_0, axis=1)
                     meta_val[:, 1] = np.mean(meta_val_1, axis=1)
-                    meta_val[:, 2] = np.mean(meta_val_2, axis=1)
+                    # meta_val[:, 2] = np.mean(meta_val_2, axis=1)
 
 
         second_model = LogisticRegression(max_iter=10000, solver='saga', n_jobs=-1)
         second_model.fit(train_meta[:, 1:], train_meta[:, 0])
         pred = second_model.predict_proba(meta_val)[:, 1]
         # #
-        # print(roc_auc_score(self.yval, pred))
+        print(roc_auc_score(self.yval, pred))
 
-        final = pd.DataFrame(self.test["id"])
-        final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
-        final.columns = ["id", "claim"]
-        final.to_csv("sub_v9.csv", index=False)
+        # final = pd.DataFrame(self.test["id"])
+        # final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
+        # final.columns = ["id", "claim"]
+        # final.to_csv("sub_v10.csv", index=False)
 
-        print(final.head(5))
+        # print(final.head(5))
 
 
 
