@@ -75,14 +75,15 @@ import optuna
 
 def optuna_():
 
-    folds = 2
-    num_iter  =2
+    folds = 10
+    num_iter  =100
     train = pd.read_csv("train.csv")
     test = pd.read_csv("test.csv")
-
+    # train =train.loc[0:200,]
     X = pd.DataFrame(train.drop(columns=["claim", "id"]))
-    xtest = pd.DataFrame(test.drop(columns=["id"]))
+    # xtest = pd.DataFrame(test.drop(columns=["id"]))
     Y = train["claim"]
+
 
     #
     # x, xval3, y, yval3 = ms.train_test_split(X, Y,test_size=.1, shuffle=True, random_state=0)
@@ -90,13 +91,13 @@ def optuna_():
     # xtrain, xval, ytrain, yval = ms.train_test_split(x, y, test_size=.2, shuffle=True, random_state=0)
     # # xval, xtest, yval, ytest = ms.train_test_split(xval_, yval_, test_size=.5, shuffle=True, random_state=0)
 
-    mbp = build_base(X, Y,   num_iter, folds)
-    meta_x, meta_y  = mbp.create_base()
+    mbp = build_base(X, Y,test,   num_iter, folds)
+    base_mo = mbp.create_base_meta()
 
-    model = LogisticRegression()
-    model.fit(meta_x, meta_y)
-    pred = model.predict_proba(meta_x.values)[:, 1]
-    print(roc_auc_score(meta_y, pred))
+    # model = LogisticRegression()
+    # model.fit(meta_x, meta_y)
+    # pred = model.predict_proba(meta_x.values)[:, 1]
+    # print(roc_auc_score(meta_y, pred))
 
     #
     # predictions = np.zeros((len(xval3), folds))
