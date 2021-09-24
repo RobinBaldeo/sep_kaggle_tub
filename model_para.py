@@ -20,7 +20,7 @@ class model_best_para:
         self.ytrain = ytrain
         self.num_iter = num_iter
 
-    def objective(self, trial, x, y):
+    def rf_gosss_gbdt(self, trial, x, y):
         xtrain, xval = x
         ytrain, yval, j = y
 
@@ -63,7 +63,7 @@ class model_best_para:
         lst = []
         for n in ['goss', 'gbdt', 'rf']:
             study = optuna.create_study(direction='maximize', study_name="robin")
-            study.optimize(lambda i: self.objective(i, (self.xtrain, self.xval), (self.ytrain, self.yval, n)),
+            study.optimize(lambda i: self.rf_gosss_gbdt(i, (self.xtrain, self.xval), (self.ytrain, self.yval, n)),
                            n_trials=self.num_iter)
 
             lst.append(para(model_=n, best_para=json.dumps(study.best_trial.params),
@@ -82,11 +82,8 @@ class model_best_para:
 
 class build_base(model_best_para):
     def __init__(self, X_, Y_,test, num_iter, fold):
-        # X, self.weight_x, Y, self.weight_y = ms.train_test_split(X_, Y_, test_size=.1, shuffle=True, random_state=0)
-        # self.x, self.xval, self.y, self.yval = ms.train_test_split(X_, Y_, test_size=.20, shuffle=True, random_state=0)
+        self.x, self.weight_x, self.y, self.weight_y = ms.train_test_split(X_, Y_, test_size=.05, shuffle=True, random_state=0)
 
-        self.x = X_
-        self.y = Y_
         self.test = test
         self.xval = pd.DataFrame(self.test.drop(columns=["id"]))
 
@@ -100,8 +97,7 @@ class build_base(model_best_para):
             # para = pd.read_sql("select model_, best_para, m_score from base_para where model_ in ('rf', 'gbdt')", conn)
             para = pd.read_sql("select model_, best_para, m_score from base_para", conn)
             print(para)
-            print(len(para.index))
-            # df_split = ms.StratifiedKFold(n_splits=self.folds, shuffle=True)
+
 
             meta_val_0 = np.zeros((len(self.xval), self.folds))
             meta_val_1 = np.zeros((len(self.xval), self.folds))
@@ -111,6 +107,7 @@ class build_base(model_best_para):
 
             score_0 = np.zeros((1, self.folds))
             score_1 = np.zeros((1, self.folds))
+            score_2 = np.zeros((1, self.folds))
 
             start = 0
             end = 0
@@ -126,47 +123,35 @@ class build_base(model_best_para):
                     train_meta[start:end, p.Index + 1] = model.predict_proba(self.x.iloc[val, :])[:, 1]
                     if p.Index == 0:
                         meta_val_0[:, counter] = model.predict_proba(self.xval)[:, 1]
-                        # score_0[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
+                        score_0[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
                     elif p.Index== 1:
                         meta_val_1[:, counter] = model.predict_proba(self.xval)[:, 1]
-                        # score_1[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
+                        score_1[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
                     elif p.Index ==2:
                         meta_val_2[:, counter] = model.predict_proba(self.xval)[:, 1]
+                        score_2[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
 
                 start +=len(val)
 
                 if counter == self.folds - 1:
-                    # meta_val[:, 0] = (np.dot(meta_val_0, (score_0 / np.sum(score_0)).reshape(self.folds, 1))).ravel()
-                    # meta_val[:, 1] = (np.dot(meta_val_1, (score_1 / np.sum(score_1)).reshape(self.folds, 1))).ravel()
-                    # meta_val[:, 2] = (np.dot(meta_val_1, (score_1 / np.sum(score_1)).reshape(self.folds, 2))).ravel()
-                    meta_val[:, 0] = np.mean(meta_val_0, axis=1)
-                    meta_val[:, 1] = np.mean(meta_val_1, axis=1)
-                    meta_val[:, 2] = np.mean(meta_val_2, axis=1)
+                    meta_val[:, 0] = (np.dot(meta_val_0, (score_0 / np.sum(score_0)).reshape(self.folds, 1))).ravel()
+                    print(f"model 0 with score {score_0}")
+                    meta_val[:, 1] = (np.dot(meta_val_1, (score_1 / np.sum(score_1)).reshape(self.folds, 1))).ravel()
+                    print(f"model 1 with score {score_1}")
+                    meta_val[:, 2] = (np.dot(meta_val_2, (score_2 / np.sum(score_2)).reshape(self.folds, 1))).ravel()
+                    print(f"model 2 with score {score_2}")
+
 
             second_model = LogisticRegression(max_iter=10000, solver='saga', n_jobs=-1, penalty='none')
 
             second_model.fit(train_meta[:, 1:], train_meta[:, 0])
             pred = second_model.predict_proba(meta_val)[:, 1]
-            # #
-            # print(f"coco {roc_auc_score(self.yval, pred)}")
-            # print(f"gbdt {roc_auc_score(self.yval, meta_val[:, 1])}")
-            #
-            # train_meta = pd.DataFrame(train_meta)
-            # train_meta.columns = ["claim", "gbdt", "rf", "goss"]
-            #
-            # test_meta = pd.DataFrame(meta_val)
-            # test_meta.columns = ["gbdt", "rf", "goss"]
-            # test_meta = test_meta.merge(self.yval.reset_index(), right_index=True, left_index=True)
-            # test_meta = test_meta.drop(columns="index")
 
-
-            # train_meta.to_sql("train_meta", conn, if_exists="replace")
-            # test_meta.to_sql("test_meta", conn, if_exists="replace")
 
             final = pd.DataFrame(self.test["id"])
             final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
             final.columns = ["id", "claim"]
-            final.to_csv("sub_v13.csv", index=False)
+            final.to_csv("sub_v14.csv", index=False)
 
             print(final.head(5))
 
@@ -231,18 +216,6 @@ class build_base(model_best_para):
 
 
 
-
-
-
-
-
-
-        # final = pd.DataFrame(self.test["id"])
-        # final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
-        # final.columns = ["id", "claim"]
-        # final.to_csv("sub_v10.csv", index=False)
-
-        # print(final.head(5))
 
 
 
