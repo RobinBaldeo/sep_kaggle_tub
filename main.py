@@ -79,7 +79,7 @@ def optuna_():
     num_iter  =100
     train = pd.read_csv("train.csv")
     test = pd.read_csv("test.csv")
-    # train =train.loc[0:200,]
+    # train =train.loc[0:2000,]
     X = pd.DataFrame(train.drop(columns=["claim", "id"]))
     # xtest = pd.DataFrame(test.drop(columns=["id"]))
     Y = train["claim"]
@@ -92,8 +92,8 @@ def optuna_():
     # # xval, xtest, yval, ytest = ms.train_test_split(xval_, yval_, test_size=.5, shuffle=True, random_state=0)
 
     mbp = build_base(X, Y,test,   num_iter, folds)
-    base_mo = mbp.create_base_meta()
-
+    # base_mo = mbp.create_base_meta()
+    sec_mo = mbp.create_base_meta()
     # model = LogisticRegression()
     # model.fit(meta_x, meta_y)
     # pred = model.predict_proba(meta_x.values)[:, 1]
@@ -109,8 +109,10 @@ def optuna_():
     # pred = np.reshape(np.mean(predictions, axis=1), (len(xval3), 1))
     # print(roc_auc_score(yval3, pred))
 
-
-
+    # final = pd.DataFrame(self.test["id"])
+    # final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
+    # final.columns = ["id", "claim"]
+    # final.to_csv("sub_v10.csv", index=False)
 
 
     #
