@@ -25,7 +25,7 @@ def optuna_():
     # # xval, xtest, yval, ytest = ms.train_test_split(xval_, yval_, test_size=.5, shuffle=True, random_state=0)
 
     mbp = build_base(X, Y,test,   num_iter, folds)
-    # base_mo = mbp.create_base_meta()
+    # base_mo = mbp.dummy()
     sec_mo = mbp.create_base_meta()
 
 
