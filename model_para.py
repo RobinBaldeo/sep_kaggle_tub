@@ -82,7 +82,7 @@ class model_best_para:
 
 class build_base(model_best_para):
     def __init__(self, X_, Y_,test, num_iter, fold):
-        self.x, self.weight_x, self.y, self.weight_y = ms.train_test_split(X_, Y_, test_size=.05, shuffle=True, random_state=0)
+        self.x, self.weight_x, self.y, self.weight_y = ms.train_test_split(X_, Y_, test_size=.02, shuffle=True, random_state=0)
 
         self.test = test
         self.xval = pd.DataFrame(self.test.drop(columns=["id"]))
@@ -100,74 +100,67 @@ class build_base(model_best_para):
         dt = namedtuple("dt", "model_ best_para")
         para = []
 
-        para.append(dt(model_="goss", best_para={"objective": "cross_entropy", "n_estimators": 878, "lambda_l1": 0.02119367084330647, "lambda_l2": 9.259284311814404e-05, "num_leaves": 85, "min_child_samples": 42}))
-        para.append(dt(model_="rf", best_para={"n_estimators": 327, "lambda_l1": 0.00012043760866269098, "lambda_l2": 6.649019338833096e-06, "num_leaves": 246, "min_child_samples": 99, "feature_fraction": 0.7734184326473208, "bagging_fraction": 0.999835036473764, "bagging_freq": 3}))
-        para.append(dt(model_="gdbt", best_para={"n_estimators": 499, "lambda_l1": 1.0450194511913434e-06, "lambda_l2": 2.2690854683431152e-07, "num_leaves": 110, "min_child_samples": 14, "feature_fraction": 0.7468626653258925, "bagging_fraction": 0.9944777742119832, "bagging_freq": 4}))
+        para.append(dt(model_="goss", best_para={"objective": "cross_entropy", "n_estimators": 878, "lambda_l1": 0.02119367084330647, "lambda_l2": 9.259284311814404e-05, "num_leaves": 85, "min_child_samples": 42, "verbose" :-1}))
+        para.append(dt(model_="rf", best_para={"n_estimators": 327, "lambda_l1": 0.00012043760866269098, "lambda_l2": 6.649019338833096e-06, "num_leaves": 246, "min_child_samples": 99, "feature_fraction": 0.7734184326473208, "bagging_fraction": 0.999835036473764, "bagging_freq": 3, "verbose" :-1}))
+        para.append(dt(model_="gdbt", best_para={"n_estimators": 499, "lambda_l1": 1.0450194511913434e-06, "lambda_l2": 2.2690854683431152e-07, "num_leaves": 110, "min_child_samples": 14, "feature_fraction": 0.7468626653258925, "bagging_fraction": 0.9944777742119832, "bagging_freq": 4, "verbose" :-1}))
 
         para = pd.DataFrame(para)
 
 
-        # with sqlite3.connect("db.sep_tub.DB") as conn:
-        #     # para = pd.read_sql("select model_, best_para, m_score from base_para where model_ in ('rf', 'gbdt')", conn)
-        #     para = pd.read_sql("select model_, best_para, m_score from base_para", conn)
-        #     print(para)
+        meta_val = np.zeros((len(self.xval.index) * len(para.index), self.folds))
+        meta_val_ave = np.zeros((len(self.xval.index), len(para.index)))
+        weight = np.zeros((len(para.index), self.folds))
+        val_len = len(self.xval.index)
 
 
-        meta_val_0 = np.zeros((len(self.xval), self.folds))
-        meta_val_1 = np.zeros((len(self.xval), self.folds))
-        meta_val_2 = np.zeros((len(self.xval), self.folds))
-        meta_val = np.zeros((len(self.xval), len(para.index)))
-        train_meta = np.zeros((len(self.x), len(para.index) + 1))
-
-        score_0 = np.zeros((1, self.folds))
-        score_1 = np.zeros((1, self.folds))
-        score_2 = np.zeros((1, self.folds))
+        train_meta = np.zeros((len(self.x.index), len(para.index) + 1))
 
         start = 0
         end = 0
         for counter, (trn, val) in enumerate(self.df_split.split(self.x, self.y)):
             end += len(val)
             train_meta[start:end, 0] = self.y.iloc[val].values
-            print(self.y.iloc[val].values)
+
 
             for p in para.itertuples():
-                # best_para = json.loads(p.best_para)
                 model = LGBMClassifier(n_jobs=-1, **p.best_para)
                 model.fit(self.x.iloc[trn, :], self.y.iloc[trn])
                 train_meta[start:end, p.Index + 1] = model.predict_proba(self.x.iloc[val, :])[:, 1]
-                if p.Index == 0:
-                    meta_val_0[:, counter] = model.predict_proba(self.xval)[:, 1]
-                    score_0[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
-                elif p.Index== 1:
-                    meta_val_1[:, counter] = model.predict_proba(self.xval)[:, 1]
-                    score_1[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
-                elif p.Index ==2:
-                    meta_val_2[:, counter] = model.predict_proba(self.xval)[:, 1]
-                    score_2[0, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
-
+                weight[p.Index, counter] = roc_auc_score(self.weight_y, model.predict_proba(self.weight_x)[:, 1])
+                meta_val[val_len * p.Index:val_len * (p.Index + 1), counter] = model.predict_proba(self.xval)[:, 1]
             start +=len(val)
 
             if counter == self.folds - 1:
-                meta_val[:, 0] = (np.dot(meta_val_0, (score_0 / np.sum(score_0)).reshape(self.folds, 1))).ravel()
-                print(f"model 0 with score {score_0}")
-                meta_val[:, 1] = (np.dot(meta_val_1, (score_1 / np.sum(score_1)).reshape(self.folds, 1))).ravel()
-                print(f"model 1 with score {score_1}")
-                meta_val[:, 2] = (np.dot(meta_val_2, (score_2 / np.sum(score_2)).reshape(self.folds, 1))).ravel()
-                print(f"model 2 with score {score_2}")
+
+                for r in range(0,3):
+                    mv = meta_val[val_len * r:val_len * (r + 1),]
+                    sc = weight[r,]
+                    print(np.dot(mv, (sc / np.sum(sc)).reshape(self.folds, 1)))
+                    meta_val_ave[:, r] = np.dot(mv, (sc / np.sum(sc)))
+                    print(f"{p.model_} with score {sc}")
 
 
         second_model = LogisticRegression(max_iter=10000, solver='saga', n_jobs=-1, penalty='none')
 
         second_model.fit(train_meta[:, 1:], train_meta[:, 0])
-        pred = second_model.predict_proba(meta_val)[:, 1]
+        pred = second_model.predict_proba(meta_val_ave)[:, 1]
 
 
-        final = pd.DataFrame(self.test["id"])
-        final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
-        final.columns = ["id", "claim"]
-        final.to_csv("sub_v16.csv", index=False)
+        # final = pd.DataFrame(self.test["id"])
+        # final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
+        # final.columns = ["id", "claim"]
+        # final.to_csv("sub_v17.csv", index=False)
+        #
+        # print(final.head(5))
 
-        print(final.head(5))
+
+
+
+
+
+
+
+
 
     def op_log_reg(self, trial):
         with sqlite3.connect("db.sep_tub.DB") as conn:
