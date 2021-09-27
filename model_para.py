@@ -101,9 +101,9 @@ class build_base(model_best_para):
         dt = namedtuple("dt", "model_ best_para")
         para = []
 
-        para.append(dt(model_="goss", best_para={"objective": "cross_entropy", "n_estimators": 878, "lambda_l1": 0.02119367084330647, "lambda_l2": 9.259284311814404e-05, "num_leaves": 85, "min_child_samples": 42, "verbose" :-1}))
-        para.append(dt(model_="rf", best_para={"n_estimators": 327, "lambda_l1": 0.00012043760866269098, "lambda_l2": 6.649019338833096e-06, "num_leaves": 246, "min_child_samples": 99, "feature_fraction": 0.7734184326473208, "bagging_fraction": 0.999835036473764, "bagging_freq": 3, "verbose" :-1}))
-        para.append(dt(model_="gdbt", best_para={"n_estimators": 499, "lambda_l1": 1.0450194511913434e-06, "lambda_l2": 2.2690854683431152e-07, "num_leaves": 110, "min_child_samples": 14, "feature_fraction": 0.7468626653258925, "bagging_fraction": 0.9944777742119832, "bagging_freq": 4, "verbose" :-1}))
+        para.append(dt(model_="goss", best_para={"boosting_type":"goss", "objective": "cross_entropy", "n_estimators": 878, "lambda_l1": 0.02119367084330647, "lambda_l2": 9.259284311814404e-05, "num_leaves": 85, "min_child_samples": 42, "verbose" :-2}))
+        para.append(dt(model_="rf", best_para={"boosting_type":"rf","n_estimators": 327, "lambda_l1": 0.00012043760866269098, "lambda_l2": 6.649019338833096e-06, "num_leaves": 246, "min_child_samples": 99, "feature_fraction": 0.7734184326473208, "bagging_fraction": 0.999835036473764, "bagging_freq": 3, "verbose" :-2}))
+        para.append(dt(model_="gbdt", best_para={"boosting_type":"gbdt","n_estimators": 499, "lambda_l1": 1.0450194511913434e-06, "lambda_l2": 2.2690854683431152e-07, "num_leaves": 110, "min_child_samples": 14, "feature_fraction": 0.7468626653258925, "bagging_fraction": 0.9944777742119832, "bagging_freq": 4, "verbose" :-2}))
 
         para = pd.DataFrame(para)
 
@@ -136,22 +136,22 @@ class build_base(model_best_para):
                 for r in range(0,3):
                     mv = meta_val[val_len * r:val_len * (r + 1),]
                     sc = weight[r,]
-                    print(np.dot(mv, (sc / np.sum(sc)).reshape(self.folds, 1)))
+                    # print(np.dot(mv, (sc / np.sum(sc)).reshape(self.folds, 1)))
                     meta_val_ave[:, r] = np.dot(mv, (sc / np.sum(sc)))
-                    print(f"{p.model_} with score {sc}")
+                    print(f"{para.loc[r, 'model_']} with score {sc}")
 
 
         second_model2 = SGDClassifier(max_iter=10000, loss='log')
         #
         second_model2.fit(train_meta[:, 1:], train_meta[:, 0])
         pred = second_model2.predict_proba(meta_val_ave)[:, 1]
-        print(pred)
+        # print(pred)
 
 
         final = pd.DataFrame(self.test["id"])
         final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
         final.columns = ["id", "claim"]
-        final.to_csv("sub_v18.csv", index=False)
+        final.to_csv("sub_v19.csv", index=False)
 
         print(final.head(5))
 
