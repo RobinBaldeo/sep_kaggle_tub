@@ -11,6 +11,7 @@ import optuna
 from collections import namedtuple
 import  sqlite3
 import json
+from sklearn.linear_model import SGDClassifier
 
 class model_best_para:
     def __init__(self, xtrain, xval, ytrain, yval, num_iter):
@@ -82,7 +83,7 @@ class model_best_para:
 
 class build_base(model_best_para):
     def __init__(self, X_, Y_,test, num_iter, fold):
-        self.x, self.weight_x, self.y, self.weight_y = ms.train_test_split(X_, Y_, test_size=.02, shuffle=True, random_state=0)
+        self.x, self.weight_x, self.y, self.weight_y = ms.train_test_split(X_, Y_, test_size=.05, shuffle=True, random_state=0)
 
         self.test = test
         self.xval = pd.DataFrame(self.test.drop(columns=["id"]))
@@ -140,18 +141,19 @@ class build_base(model_best_para):
                     print(f"{p.model_} with score {sc}")
 
 
-        second_model = LogisticRegression(max_iter=10000, solver='saga', n_jobs=-1, penalty='none')
-
-        second_model.fit(train_meta[:, 1:], train_meta[:, 0])
-        pred = second_model.predict_proba(meta_val_ave)[:, 1]
-
-
-        # final = pd.DataFrame(self.test["id"])
-        # final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
-        # final.columns = ["id", "claim"]
-        # final.to_csv("sub_v17.csv", index=False)
+        second_model2 = SGDClassifier(max_iter=10000, loss='log')
         #
-        # print(final.head(5))
+        second_model2.fit(train_meta[:, 1:], train_meta[:, 0])
+        pred = second_model2.predict_proba(meta_val_ave)[:, 1]
+        print(pred)
+
+
+        final = pd.DataFrame(self.test["id"])
+        final = final.merge(pd.DataFrame(pred), right_index=True, left_index=True)
+        final.columns = ["id", "claim"]
+        final.to_csv("sub_v18.csv", index=False)
+
+        print(final.head(5))
 
 
 

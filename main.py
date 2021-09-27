@@ -11,8 +11,8 @@ def optuna_():
     num_iter  =100
     train = pd.read_csv("train.csv")
     test = pd.read_csv("test.csv")
-    # train =train.loc[0:2000,]
-    # test = test.loc[0:2000, ]
+    # train =train.loc[0:1000,]
+    # test = test.loc[0:1000, ]
     X = pd.DataFrame(train.drop(columns=["claim", "id"]))
     # xtest = pd.DataFrame(test.drop(columns=["id"]))
     Y = train["claim"]
